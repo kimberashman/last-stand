@@ -3,7 +3,7 @@ import HealthKit
 import Combine
 
 class HealthKitManager: ObservableObject {
-    private let healthStore = HKHealthStore()
+    let healthStore = HKHealthStore()
     private let standHourType = HKObjectType.categoryType(forIdentifier: .appleStandHour)!
     
     @Published var lastStandTime: Date?

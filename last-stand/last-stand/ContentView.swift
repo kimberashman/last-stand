@@ -11,14 +11,16 @@ struct ContentView: View {
     @EnvironmentObject private var healthKitManager: HealthKitManager
     
     var body: some View {
-        VStack(spacing: 20) {
-            if !healthKitManager.isAuthorized {
-                authorizationView
-            } else {
-                mainView
+        ScrollView {
+            VStack(spacing: 20) {
+                if !healthKitManager.isAuthorized {
+                    authorizationView
+                } else {
+                    StandingClockView()
+                }
             }
+            .padding()
         }
-        .padding()
     }
     
     private var authorizationView: some View {
@@ -40,38 +42,6 @@ struct ContentView: View {
             }
             .buttonStyle(.borderedProminent)
         }
-    }
-    
-    private var mainView: some View {
-        VStack(spacing: 24) {
-            Text("Time Since Last Stand")
-                .font(.title2)
-                .foregroundColor(.secondary)
-            
-            Text(timeString)
-                .font(.system(size: 60, weight: .bold, design: .rounded))
-                .monospacedDigit()
-            
-            if let lastStand = healthKitManager.lastStandTime {
-                Text("Last stood at \(lastStand.formatted(date: .omitted, time: .shortened))")
-                    .foregroundColor(.secondary)
-            }
-            
-            Button(action: {
-                healthKitManager.fetchLastStandTime()
-            }) {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
-            .buttonStyle(.bordered)
-        }
-    }
-    
-    private var timeString: String {
-        let hours = Int(healthKitManager.timeSinceLastStand) / 3600
-        let minutes = Int(healthKitManager.timeSinceLastStand) / 60 % 60
-        let seconds = Int(healthKitManager.timeSinceLastStand) % 60
-        
-        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 }
 
