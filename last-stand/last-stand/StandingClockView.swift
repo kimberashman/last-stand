@@ -7,50 +7,56 @@ struct StandingClockView: View {
     
     let mainHours = [0, 3, 6, 9, 12, 15, 18, 21]
     let mainLabels = ["12am", "3am", "6am", "9am", "12pm", "3pm", "6pm", "9pm"]
-    let clockSize: CGFloat = 300
+    let clockSize: CGFloat = 260
     let ringWidth: CGFloat = 24
-    let labelRadiusOffset: CGFloat = 24 // Closer to the ring
-    let dotRadiusOffset: CGFloat = 24   // Dots outside the ring, aligned with labels
+    var labelRadiusOffset: CGFloat {
+        ringWidth / 2 + 14
+    }
+    var dotRadiusOffset: CGFloat {
+        ringWidth / 2 + 14
+    }
     
     var body: some View {
         GeometryReader { geometry in
-            let screenHeight = geometry.size.height
-            let ringTotalHeight = clockSize
-            let centerY = screenHeight / 2
-            let adaptiveLightGrey = Color(UIColor.systemGray5)
-            let adaptiveDarkGrey = Color(UIColor.systemGray)
-            let adaptiveBackground = Color(.systemBackground)
-            let adaptiveText = Color.primary
-            
+            let labelPadding: CGFloat = 48
+            let totalDiameter = clockSize + 2 * labelPadding
+
             ZStack {
-                adaptiveBackground.ignoresSafeArea()
-                
-                // Ring and labels centered at screen center
-                VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: centerY - ringTotalHeight / 2 - 40) // 40 for title spacing
-                    // Title above ring
-                    Text("Today's Standing Activity")
-                        .font(.title2)
-                        .bold()
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(adaptiveText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.bottom, 60) // Padding between title and ring
-                    // Ring
+                Color(.systemBackground).ignoresSafeArea()
+
+                // Centered container for ring + labels using Spacer-based centering
+                VStack {
+                    Spacer().frame(minHeight: 110)
                     ZStack {
                         // Background ring
                         Circle()
-                            .stroke(adaptiveLightGrey, lineWidth: ringWidth)
+                            .stroke(Color(UIColor.systemGray5), lineWidth: ringWidth)
                             .frame(width: clockSize, height: clockSize)
+                            .position(x: totalDiameter / 2, y: totalDiameter / 2)
+
                         // Major hour labels (outside the ring)
                         ForEach(Array(mainHours.enumerated()), id: \ .offset) { idx, hour in
-                            HourLabel(label: mainLabels[idx], hour: hour, clockSize: clockSize, ringWidth: ringWidth, labelRadiusOffset: labelRadiusOffset, adaptiveText: adaptiveText)
+                            HourLabel(
+                                label: mainLabels[idx],
+                                hour: hour,
+                                clockSize: clockSize,
+                                ringWidth: ringWidth,
+                                labelRadiusOffset: labelRadiusOffset,
+                                adaptiveText: Color.primary,
+                                containerSize: totalDiameter
+                            )
                         }
                         // Dots for every hour except main label hours, outside the ring
                         ForEach(0..<24) { hour in
                             if !mainHours.contains(hour) {
-                                MinorHourDot(hour: hour, clockSize: clockSize, ringWidth: ringWidth, dotRadiusOffset: dotRadiusOffset, adaptiveText: adaptiveText)
+                                MinorHourDot(
+                                    hour: hour,
+                                    clockSize: clockSize,
+                                    ringWidth: ringWidth,
+                                    dotRadiusOffset: dotRadiusOffset,
+                                    adaptiveText: Color.primary,
+                                    containerSize: totalDiameter
+                                )
                             }
                         }
                         // Activity arc (thick)
@@ -62,9 +68,11 @@ struct StandingClockView: View {
                                     hasData: true,
                                     ringWidth: ringWidth,
                                     clockSize: clockSize,
-                                    lightGrey: adaptiveLightGrey,
-                                    darkGrey: adaptiveDarkGrey
+                                    lightGrey: Color(UIColor.systemGray5),
+                                    darkGrey: Color(UIColor.systemGray)
                                 )
+                                .frame(width: clockSize, height: clockSize)
+                                .position(x: totalDiameter / 2, y: totalDiameter / 2)
                             } else {
                                 StandingArcSegment(
                                     hour: hour,
@@ -72,9 +80,11 @@ struct StandingClockView: View {
                                     hasData: false,
                                     ringWidth: ringWidth,
                                     clockSize: clockSize,
-                                    lightGrey: adaptiveLightGrey,
-                                    darkGrey: adaptiveDarkGrey
+                                    lightGrey: Color(UIColor.systemGray5),
+                                    darkGrey: Color(UIColor.systemGray)
                                 )
+                                .frame(width: clockSize, height: clockSize)
+                                .position(x: totalDiameter / 2, y: totalDiameter / 2)
                             }
                         }
                         // Center text showing current time
@@ -82,28 +92,48 @@ struct StandingClockView: View {
                             Text(timeString)
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .monospacedDigit()
-                                .foregroundColor(adaptiveText)
+                                .foregroundColor(Color.primary)
                             Text("since last stand")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+                        .position(x: totalDiameter / 2, y: totalDiameter / 2)
                     }
-                    .frame(width: clockSize, height: clockSize)
-                    .padding(.bottom, 60) // Padding between ring and legend
-                    // Legend below ring
-                    HStack(spacing: 20) {
-                        LegendItem(color: .green, label: "Standing")
-                        LegendItem(color: adaptiveDarkGrey, label: "Sitting")
-                        LegendItem(color: adaptiveLightGrey, label: "No Data")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 0)
-                    .foregroundColor(adaptiveText)
+                    .frame(width: totalDiameter, height: totalDiameter)
+                    Spacer().frame(minHeight: 110)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Title at the top (overlay, not affecting centering)
+                VStack {
+                    Text("Today's Standing Activity")
+                        .font(.title2)
+                        .bold()
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(Color.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                        .padding(.bottom, 20)
                     Spacer()
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                // Legend at the bottom (overlay, not affecting centering)
+                VStack {
+                    Spacer()
+                    HStack(spacing: 30) {
+                        LegendItem(color: .green, label: "Standing")
+                        LegendItem(color: Color(UIColor.systemGray), label: "Sitting")
+                        LegendItem(color: Color(UIColor.systemGray5), label: "No Data")
+                    }
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(Color.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 32)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
+            .clipped()
         }
         .onAppear {
             fetchStandingData()
@@ -162,20 +192,26 @@ struct HourLabel: View {
     let ringWidth: CGFloat
     let labelRadiusOffset: CGFloat
     let adaptiveText: Color
-    
+    let containerSize: CGFloat
+
     var body: some View {
         Text(label)
-            .font(.system(size: 13, weight: .bold))
+            .font(.system(size: 12, weight: .medium))
+            .fixedSize()
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
             .foregroundColor(adaptiveText)
             .shadow(color: Color(.systemBackground).opacity(0.2), radius: 1, x: 0, y: 1)
-            .position(labelPosition(radius: clockSize / 2 + ringWidth / 2 + labelRadiusOffset))
+            .frame(width: 40)
+            .allowsTightening(true)
+            .position(labelPosition(radius: clockSize / 2 + labelRadiusOffset))
     }
-    
+
     private func labelPosition(radius: CGFloat) -> CGPoint {
         let angle = Double(hour) * 15 - 90
         let rad = angle * .pi / 180
-        let x = cos(rad) * Double(radius) + Double(clockSize / 2)
-        let y = sin(rad) * Double(radius) + Double(clockSize / 2)
+        let x = cos(rad) * Double(radius) + Double(containerSize / 2)
+        let y = sin(rad) * Double(radius) + Double(containerSize / 2)
         return CGPoint(x: x, y: y)
     }
 }
@@ -186,19 +222,20 @@ struct MinorHourDot: View {
     let ringWidth: CGFloat
     let dotRadiusOffset: CGFloat
     let adaptiveText: Color
-    
+    let containerSize: CGFloat
+
     var body: some View {
         Circle()
             .fill(adaptiveText)
             .frame(width: 5, height: 5)
-            .position(dotPosition(radius: clockSize / 2 + ringWidth / 2 + dotRadiusOffset))
+            .position(dotPosition(radius: clockSize / 2 + dotRadiusOffset))
     }
-    
+
     private func dotPosition(radius: CGFloat) -> CGPoint {
         let angle = Double(hour) * 15 - 90
         let rad = angle * .pi / 180
-        let x = cos(rad) * Double(radius) + Double(clockSize / 2)
-        let y = sin(rad) * Double(radius) + Double(clockSize / 2)
+        let x = cos(rad) * Double(radius) + Double(containerSize / 2)
+        let y = sin(rad) * Double(radius) + Double(containerSize / 2)
         return CGPoint(x: x, y: y)
     }
 }
@@ -257,4 +294,4 @@ struct LegendItem: View {
 #Preview {
     StandingClockView()
         .environmentObject(HealthKitManager())
-} 
+}
