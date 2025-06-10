@@ -9,18 +9,44 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var healthKitManager: HealthKitManager
+    @State private var isRefreshing = false
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                if !healthKitManager.isAuthorized {
-                    authorizationView
-                } else {
-                    StandingClockView()
+        ZStack(alignment: .topTrailing) {
+            Color(uiColor: .systemBackground).ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 20) {
+                    if !healthKitManager.isAuthorized {
+                        authorizationView
+                    } else {
+                        StandingClockView()
+                    }
                 }
+                .padding()
+                .frame(maxWidth: .infinity)
             }
-            .padding()
+
+            if healthKitManager.isAuthorized {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        isRefreshing = true
+                    }
+                        DispatchQueue.main.async {
+                            isRefreshing = false
+                        }
+                    
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .rotationEffect(isRefreshing ? .degrees(360) : .degrees(0))
+                        .animation(isRefreshing ? .easeInOut(duration: 1).repeatCount(1, autoreverses: false) : .default, value: isRefreshing)
+                        .imageScale(.large)
+                }
+                .padding()
+                .accessibilityHint("Immediately re-checks your stand data")
+            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var authorizationView: some View {
@@ -41,6 +67,7 @@ struct ContentView: View {
                 healthKitManager.requestAuthorization()
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityHint("Grants permission to access your Health data")
         }
     }
 }

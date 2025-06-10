@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSMotionUsageDescription</key>
+    <string>This app uses motion data to detect when you've walked or stood up.</string>
     <key>NSHealthShareUsageDescription</key>
     <string>Last Stand needs access to your stand data to track when you last stood up.</string>
     <key>NSHealthUpdateUsageDescription</key>
@@ -14,4 +16,4 @@
         <dict/>
     </dict>
 </dict>
-</plist> 
+</plist>

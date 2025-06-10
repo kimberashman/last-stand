@@ -1,6 +1,12 @@
 import SwiftUI
 import HealthKit
 
+let ringActiveColor = Color(red: 0.95, green: 0.27, blue: 0.49)    // pink/magenta
+let ringPartialColor = Color(red: 1.0, green: 0.5, blue: 0.3)      // coral/orange
+let ringInactiveColor = Color(red: 0.22, green: 0.39, blue: 0.44)  // teal-grey
+let backgroundColor = Color(.systemBackground)
+let textColor = Color.white
+
 struct StandingClockView: View {
     @EnvironmentObject private var healthKitManager: HealthKitManager
     @State private var standingData: [StandingData] = []
@@ -22,7 +28,7 @@ struct StandingClockView: View {
             let totalDiameter = clockSize + 2 * labelPadding
 
             ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+                Color(backgroundColor)
 
                 // Centered container for ring + labels using Spacer-based centering
                 VStack {
@@ -30,19 +36,19 @@ struct StandingClockView: View {
                     ZStack {
                         // Background ring
                         Circle()
-                            .stroke(Color(UIColor.systemGray5), lineWidth: ringWidth)
+                            .stroke(ringInactiveColor, lineWidth: ringWidth)
                             .frame(width: clockSize, height: clockSize)
                             .position(x: totalDiameter / 2, y: totalDiameter / 2)
 
                         // Major hour labels (outside the ring)
-                        ForEach(Array(mainHours.enumerated()), id: \ .offset) { idx, hour in
+                        ForEach(Array(mainHours.enumerated()), id: \.offset) { idx, hour in
                             HourLabel(
                                 label: mainLabels[idx],
                                 hour: hour,
                                 clockSize: clockSize,
                                 ringWidth: ringWidth,
                                 labelRadiusOffset: labelRadiusOffset,
-                                adaptiveText: Color.primary,
+                                adaptiveText: textColor,
                                 containerSize: totalDiameter
                             )
                         }
@@ -54,7 +60,7 @@ struct StandingClockView: View {
                                     clockSize: clockSize,
                                     ringWidth: ringWidth,
                                     dotRadiusOffset: dotRadiusOffset,
-                                    adaptiveText: Color.primary,
+                                    adaptiveText: textColor,
                                     containerSize: totalDiameter
                                 )
                             }
@@ -68,8 +74,8 @@ struct StandingClockView: View {
                                     hasData: true,
                                     ringWidth: ringWidth,
                                     clockSize: clockSize,
-                                    lightGrey: Color(UIColor.systemGray5),
-                                    darkGrey: Color(UIColor.systemGray)
+                                    lightGrey: ringInactiveColor,
+                                    darkGrey: ringPartialColor
                                 )
                                 .frame(width: clockSize, height: clockSize)
                                 .position(x: totalDiameter / 2, y: totalDiameter / 2)
@@ -80,8 +86,8 @@ struct StandingClockView: View {
                                     hasData: false,
                                     ringWidth: ringWidth,
                                     clockSize: clockSize,
-                                    lightGrey: Color(UIColor.systemGray5),
-                                    darkGrey: Color(UIColor.systemGray)
+                                    lightGrey: ringInactiveColor,
+                                    darkGrey: ringPartialColor
                                 )
                                 .frame(width: clockSize, height: clockSize)
                                 .position(x: totalDiameter / 2, y: totalDiameter / 2)
@@ -92,10 +98,10 @@ struct StandingClockView: View {
                             Text(timeString)
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .monospacedDigit()
-                                .foregroundColor(Color.primary)
+                                .foregroundColor(textColor)
                             Text("since last stand")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(textColor.opacity(0.6))
                         }
                         .position(x: totalDiameter / 2, y: totalDiameter / 2)
                     }
@@ -110,7 +116,7 @@ struct StandingClockView: View {
                         .font(.title2)
                         .bold()
                         .multilineTextAlignment(.center)
-                        .foregroundColor(Color.primary)
+                        .foregroundColor(textColor)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
                         .padding(.bottom, 20)
@@ -122,17 +128,19 @@ struct StandingClockView: View {
                 VStack {
                     Spacer()
                     HStack(spacing: 30) {
-                        LegendItem(color: .green, label: "Standing")
-                        LegendItem(color: Color(UIColor.systemGray), label: "Sitting")
-                        LegendItem(color: Color(UIColor.systemGray5), label: "No Data")
+                        LegendItem(color: ringActiveColor, label: "Standing")
+                        LegendItem(color: ringPartialColor, label: "Sitting")
+                        LegendItem(color: ringInactiveColor, label: "No Data")
                     }
                     .multilineTextAlignment(.center)
-                    .foregroundColor(Color.primary)
+                    .foregroundColor(textColor)
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 32)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
+            .ignoresSafeArea()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
         }
         .onAppear {
@@ -150,13 +158,13 @@ struct StandingClockView: View {
         let calendar = Calendar.current
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
-        
+
         let predicate = HKQuery.predicateForSamples(
             withStart: startOfDay,
             end: now,
             options: .strictStartDate
         )
-        
+
         let query = HKSampleQuery(
             sampleType: HKObjectType.categoryType(forIdentifier: .appleStandHour)!,
             predicate: predicate,
@@ -166,21 +174,25 @@ struct StandingClockView: View {
             guard let samples = samples as? [HKCategorySample], error == nil else {
                 return
             }
-            
+
             var data: [StandingData] = []
             for hour in 0..<24 {
                 let hourDate = calendar.date(byAdding: .hour, value: hour, to: startOfDay)!
+                let hourStart = calendar.date(byAdding: .hour, value: hour, to: startOfDay)!
+                let hourEnd = calendar.date(byAdding: .hour, value: hour + 1, to: startOfDay)!
                 let didStand = samples.contains { sample in
-                    calendar.component(.hour, from: sample.startDate) == hour
+                    sample.startDate >= hourStart &&
+                    sample.startDate < hourEnd &&
+                    sample.value == HKCategoryValueAppleStandHour.stood.rawValue
                 }
                 data.append(StandingData(hour: hour, didStand: didStand, date: hourDate))
             }
-            
+
             DispatchQueue.main.async {
                 self.standingData = data
             }
         }
-        
+
         healthKitManager.healthStore.execute(query)
     }
 }
@@ -259,11 +271,11 @@ struct StandingArcSegment: View {
     
     private var segmentColor: Color {
         if !hasData {
-            return lightGrey
+            return ringInactiveColor
         } else if didStand {
-            return .green
+            return ringActiveColor
         } else {
-            return darkGrey
+            return ringPartialColor
         }
     }
     
