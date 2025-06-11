@@ -1,5 +1,11 @@
 import SwiftUI
 import HealthKit
+import Foundation
+struct StepInterval {
+    let startDate: Date
+    let endDate: Date
+    let stepCount: Int
+}
 
 let ringActiveColor = Color(red: 0.95, green: 0.27, blue: 0.49)    // pink/magenta
 let ringPartialColor = Color(red: 1.0, green: 0.5, blue: 0.3)      // coral/orange
@@ -7,9 +13,18 @@ let ringInactiveColor = Color(red: 0.22, green: 0.39, blue: 0.44)  // teal-grey
 let backgroundColor = Color(.systemBackground)
 let textColor = Color.white
 
+struct ActivitySegment: Identifiable {
+    let id = UUID()
+    let start: Date
+    let end: Date
+    let isActive: Bool?
+}
+
 struct StandingClockView: View {
     @EnvironmentObject private var healthKitManager: HealthKitManager
-    @State private var standingData: [StandingData] = []
+    @State private var activitySegments: [ActivitySegment] = []
+    @State private var lastStandInterval: Date? = nil
+    @State private var intervals: [StepInterval] = []
     
     let mainHours = [0, 3, 6, 9, 12, 15, 18, 21]
     let mainLabels = ["12am", "3am", "6am", "9am", "12pm", "3pm", "6pm", "9pm"]
@@ -41,7 +56,7 @@ struct StandingClockView: View {
                             .position(x: totalDiameter / 2, y: totalDiameter / 2)
 
                         // Major hour labels (outside the ring)
-                        ForEach(Array(mainHours.enumerated()), id: \.offset) { idx, hour in
+                        ForEach(Array(mainHours.enumerated()), id: \ .offset) { idx, hour in
                             HourLabel(
                                 label: mainLabels[idx],
                                 hour: hour,
@@ -65,33 +80,29 @@ struct StandingClockView: View {
                                 )
                             }
                         }
-                        // Activity arc (thick)
-                        ForEach(0..<24) { hour in
-                            if let data = standingData.first(where: { $0.hour == hour }) {
-                                StandingArcSegment(
-                                    hour: hour,
-                                    didStand: data.didStand,
-                                    hasData: true,
-                                    ringWidth: ringWidth,
-                                    clockSize: clockSize,
-                                    lightGrey: ringInactiveColor,
-                                    darkGrey: ringPartialColor
-                                )
-                                .frame(width: clockSize, height: clockSize)
-                                .position(x: totalDiameter / 2, y: totalDiameter / 2)
-                            } else {
-                                StandingArcSegment(
-                                    hour: hour,
-                                    didStand: false,
-                                    hasData: false,
-                                    ringWidth: ringWidth,
-                                    clockSize: clockSize,
-                                    lightGrey: ringInactiveColor,
-                                    darkGrey: ringPartialColor
-                                )
-                                .frame(width: clockSize, height: clockSize)
-                                .position(x: totalDiameter / 2, y: totalDiameter / 2)
-                            }
+                        // Fine-grained activity segments (5-min intervals)
+                        ForEach(activitySegments.indices, id: \.self) { idx in
+                            let segment = activitySegments[idx]
+                            let color: Color = {
+                                switch segment.isActive {
+                                case .some(true):
+                                    return ringActiveColor
+                                case .some(false):
+                                    return ringPartialColor
+                                case .none:
+                                    return ringInactiveColor
+                                }
+                            }()
+
+                            FineArcSegment(
+                                index: idx,
+                                total: activitySegments.count,
+                                color: color,
+                                ringWidth: ringWidth,
+                                clockSize: clockSize
+                            )
+                            .frame(width: clockSize, height: clockSize)
+                            .position(x: totalDiameter / 2, y: totalDiameter / 2)
                         }
                         // Center text showing current time
                         VStack {
@@ -144,56 +155,77 @@ struct StandingClockView: View {
             .clipped()
         }
         .onAppear {
-            fetchStandingData()
+            fetchActivitySegments()
+            let manager = healthKitManager
+            manager.fetchStepCountsByInterval { stepCounts in
+                let mapped = stepCounts.map { (date, steps) in
+                    print("🧭 Mapped interval: \(date) → \(steps) steps")
+                    return StepInterval(startDate: date, endDate: date.addingTimeInterval(120), stepCount: Int(steps))
+                }
+                DispatchQueue.main.async {
+                    self.intervals = mapped.sorted { $0.startDate < $1.startDate }
+                    self.lastStandInterval = computeLastStandInterval(from: self.intervals)
+                }
+            }
         }
     }
     
     private var timeString: String {
-        let hours = Int(healthKitManager.timeSinceLastStand) / 3600
-        let minutes = Int(healthKitManager.timeSinceLastStand) / 60 % 60
-        return String(format: "%02d:%02d", hours, minutes)
+        let now = Date()
+        if let lastStand = lastStandInterval {
+            let timeSince = now.timeIntervalSince(lastStand)
+            let hours = Int(timeSince) / 3600
+            let minutes = Int(timeSince) / 60 % 60
+            return String(format: "%02d:%02d", hours, minutes)
+        } else {
+            return "--:--"
+        }
     }
     
-    private func fetchStandingData() {
-        let calendar = Calendar.current
+    private func computeLastStandInterval(from intervals: [StepInterval]) -> Date? {
         let now = Date()
-        let startOfDay = calendar.startOfDay(for: now)
-
-        let predicate = HKQuery.predicateForSamples(
-            withStart: startOfDay,
-            end: now,
-            options: .strictStartDate
-        )
-
-        let query = HKSampleQuery(
-            sampleType: HKObjectType.categoryType(forIdentifier: .appleStandHour)!,
-            predicate: predicate,
-            limit: HKObjectQueryNoLimit,
-            sortDescriptors: nil
-        ) { _, samples, error in
-            guard let samples = samples as? [HKCategorySample], error == nil else {
-                return
-            }
-
-            var data: [StandingData] = []
-            for hour in 0..<24 {
-                let hourDate = calendar.date(byAdding: .hour, value: hour, to: startOfDay)!
-                let hourStart = calendar.date(byAdding: .hour, value: hour, to: startOfDay)!
-                let hourEnd = calendar.date(byAdding: .hour, value: hour + 1, to: startOfDay)!
-                let didStand = samples.contains { sample in
-                    sample.startDate >= hourStart &&
-                    sample.startDate < hourEnd &&
-                    sample.value == HKCategoryValueAppleStandHour.stood.rawValue
-                }
-                data.append(StandingData(hour: hour, didStand: didStand, date: hourDate))
-            }
-
-            DispatchQueue.main.async {
-                self.standingData = data
-            }
+        if let recent = intervals.reversed().first(where: { interval in
+            let isRecent = now.timeIntervalSince(interval.startDate) < 15 * 60 // 15 minutes
+            let recentEnough = interval.stepCount >= 8 && isRecent // reduced threshold
+            print("🔍 Checking interval at \(interval.startDate): \(interval.stepCount) steps, recent: \(isRecent) → valid: \(recentEnough)")
+            return recentEnough
+        }) {
+            print("✅ Found valid standing interval at \(recent.startDate) with \(recent.stepCount) steps")
+            return recent.startDate
+        } else {
+            print("❌ No valid standing intervals found in the last 15 minutes")
+            return nil
         }
-
-        healthKitManager.healthStore.execute(query)
+    }
+    
+    private func fetchActivitySegments() {
+        healthKitManager.fetchStepCountsByInterval { stepCounts in
+            let calendar = Calendar.current
+            let now = Date()
+            let startOfDay = calendar.startOfDay(for: now)
+            var segments: [ActivitySegment] = []
+            var anchor = startOfDay
+            for _ in 0..<288 { // 24*12 = 288 intervals
+                let end = calendar.date(byAdding: .minute, value: 5, to: anchor)!
+                if let steps = stepCounts[anchor] {
+                    print("🪵 Interval starting at \(anchor): Steps = \(steps)")
+                    let isActive: Bool?
+                    if steps >= 8 { // reduced threshold
+                        isActive = true
+                    } else if steps == 0 {
+                        isActive = false
+                    } else {
+                        isActive = nil
+                    }
+                    segments.append(ActivitySegment(start: anchor, end: end, isActive: isActive))
+                } else {
+                    segments.append(ActivitySegment(start: anchor, end: end, isActive: nil))
+                }
+                anchor = end
+            }
+            print("📊 Total intervals processed: \(stepCounts.count)")
+            self.activitySegments = segments.sorted { $0.start < $1.start }
+        }
     }
 }
 
@@ -252,39 +284,27 @@ struct MinorHourDot: View {
     }
 }
 
-struct StandingArcSegment: View {
-    let hour: Int
-    let didStand: Bool
-    let hasData: Bool
+struct FineArcSegment: View {
+    let index: Int
+    let total: Int
+    let color: Color
     let ringWidth: CGFloat
     let clockSize: CGFloat
-    let lightGrey: Color
-    let darkGrey: Color
     
     var body: some View {
         Circle()
             .trim(from: startAngle, to: endAngle)
-            .stroke(segmentColor, lineWidth: ringWidth)
+            .stroke(color, lineWidth: ringWidth)
             .frame(width: clockSize, height: clockSize)
             .rotationEffect(.degrees(-90))
     }
     
-    private var segmentColor: Color {
-        if !hasData {
-            return ringInactiveColor
-        } else if didStand {
-            return ringActiveColor
-        } else {
-            return ringPartialColor
-        }
-    }
-    
     private var startAngle: Double {
-        Double(hour) / 24.0
+        Double(index) / Double(total)
     }
     
     private var endAngle: Double {
-        Double(hour + 1) / 24.0
+        Double(index + 1) / Double(total)
     }
 }
 
