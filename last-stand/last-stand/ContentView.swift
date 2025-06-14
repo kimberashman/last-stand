@@ -43,34 +43,34 @@ struct ContentView: View {
                         isRefreshing = true
                     }
                     healthKitManager.forceRefresh {
-                        withAnimation {
-                            isRefreshing = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            withAnimation {
+                                isRefreshing = false
+                            }
                         }
                     }
                 }) {
                     Image(systemName: "arrow.clockwise")
-                        .rotationEffect(Angle(degrees: refreshAngle))
                         .font(.system(size: 18, weight: .medium))
                         .foregroundColor(.white)
                         .padding(10)
                         .background(Color("RingActive"))
                         .clipShape(Circle())
                         .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
-                        .task {
-                            if isRefreshing {
-                                while isRefreshing {
-                                    try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-                                    refreshAngle += 20
-                                    if refreshAngle >= 360 { refreshAngle -= 360 }
-                                }
-                            } else {
-                                refreshAngle = 0
-                            }
-                        }
                 }
                 .padding()
                 .disabled(isRefreshing)
                 .opacity(isRefreshing ? 0.6 : 1.0)
+                
+                if isRefreshing {
+                    ZStack {
+                        Color.black.opacity(0.2)
+                            .edgesIgnoringSafeArea(.all)
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                    }
+                }
             }
         }
     }

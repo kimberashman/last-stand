@@ -1,6 +1,7 @@
 import SwiftUI
 import HealthKit
 import Foundation
+import UIKit
 struct StepInterval {
     let startDate: Date
     let endDate: Date
@@ -85,6 +86,9 @@ struct StandingClockView: View {
     @State private var activitySegments: [ActivitySegment] = []
     @State private var lastStandInterval: Date? = nil
     @State private var intervals: [StepInterval] = []
+    @State private var timer: Timer? = nil
+    @State private var isRefreshing = false
+    @State private var rotation: Double = 0
     
     let mainHours = [0, 3, 6, 9, 12, 15, 18, 21]
     let mainLabels = ["12am", "3am", "6am", "9am", "12pm", "3pm", "6pm", "9pm"]
@@ -182,10 +186,23 @@ struct StandingClockView: View {
                     }
                     // Center text showing current time
                     VStack {
-                        Text(timeString)
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundColor(textColor)
+                        if isRefreshing {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .resizable()
+                                .frame(width: 30, height: 30)
+                                .foregroundColor(textColor)
+                                .rotationEffect(.degrees(rotation))
+                                .onAppear {
+                                    withAnimation(Animation.linear(duration: 1).repeatForever(autoreverses: false)) {
+                                        rotation = 360
+                                    }
+                                }
+                        } else {
+                            Text(timeString)
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(textColor)
+                        }
                         Text("since last move")
                             .font(.caption)
                             .foregroundColor(textColor.opacity(0.6))
@@ -216,17 +233,45 @@ struct StandingClockView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
         .onAppear {
-            fetchActivitySegments()
-            let manager = healthKitManager
-            manager.fetchStepCountsByInterval { stepCounts in
-                let mapped = stepCounts.map { (date, steps) in
-                    print("🧭 Mapped interval: \(date) → \(steps) steps")
-                    return StepInterval(startDate: date, endDate: date.addingTimeInterval(120), stepCount: Int(steps))
-                }
-                DispatchQueue.main.async {
-                    self.intervals = mapped.sorted { $0.startDate < $1.startDate }
-                    self.lastStandInterval = computeLastStandInterval(from: self.intervals)
-                }
+            setupTimer()
+            refreshData()
+        }
+        .onDisappear {
+            timer?.invalidate()
+            timer = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            refreshData()
+        }
+    }
+    
+    private func setupTimer() {
+        // Refresh every minute
+        timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            refreshData()
+        }
+    }
+    
+    private func refreshData() {
+        print("🔄 Starting data refresh...")
+        DispatchQueue.main.async {
+            self.isRefreshing = true
+            self.rotation = 0
+        }
+        
+        fetchActivitySegments()
+        let manager = healthKitManager
+        manager.fetchStepCountsByInterval { stepCounts in
+            print("📊 Received \(stepCounts.count) step count intervals")
+            let mapped = stepCounts.map { (date, steps) in
+                print("🧭 Mapped interval: \(date) → \(steps) steps")
+                return StepInterval(startDate: date, endDate: date.addingTimeInterval(120), stepCount: Int(steps))
+            }
+            DispatchQueue.main.async {
+                self.intervals = mapped.sorted { $0.startDate < $1.startDate }
+                self.lastStandInterval = computeLastStandInterval(from: self.intervals)
+                self.isRefreshing = false
+                print("✅ Data refresh complete")
             }
         }
     }
@@ -244,7 +289,6 @@ struct StandingClockView: View {
     }
     
     private func computeLastStandInterval(from intervals: [StepInterval]) -> Date? {
-        let now = Date()
         if let recent = intervals.reversed().first(where: { interval in
             let recentEnough = interval.stepCount >= 8 // reduced threshold
             print("🔍 Checking interval at \(interval.startDate): \(interval.stepCount) steps → valid: \(recentEnough)")
