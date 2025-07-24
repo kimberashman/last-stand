@@ -8,9 +8,9 @@ struct StepInterval {
     let stepCount: Int
 }
 
-let ringActiveColor = Color(red: 0.95, green: 0.27, blue: 0.49)    // pink/magenta
-let ringPartialColor = Color(red: 1.0, green: 0.5, blue: 0.3)      // coral/orange
-let ringInactiveColor = Color(red: 0.22, green: 0.39, blue: 0.44)  // teal-grey
+let ringActiveColor = Color(red: 0x24 / 255.0, green: 0xFE / 255.0, blue: 0xA5 / 255.0) // mint green
+let ringPartialColor = Color(red: 0x17/255.0, green: 0x69/255.0, blue: 0x87/255.0) // deep teal
+let ringInactiveColor = Color(red: 0x12/255.0, green: 0x1B/255.0, blue: 0x26/255.0) // dark teal-blue 
 let backgroundColor = Color(.systemBackground)
 let textColor = Color.white
 
@@ -219,7 +219,7 @@ struct StandingClockView: View {
                 Spacer()
                 HStack(spacing: 30) {
                     LegendItem(color: ringActiveColor, label: "Moving")
-                    LegendItem(color: ringPartialColor, label: "Sitting")
+                    LegendItem(color: ringPartialColor, label: "Still")
                     LegendItem(color: ringInactiveColor, label: "No Data")
                 }
                 .multilineTextAlignment(.center)
