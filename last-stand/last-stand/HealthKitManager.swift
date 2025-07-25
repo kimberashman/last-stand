@@ -61,7 +61,7 @@ class HealthKitManager: ObservableObject {
                     print("recentlyWalked:", self.recentlyWalked)
                     print("Time since sample:", now.timeIntervalSince(stepSample.endDate))
                     
-                    if stepCount >= 30 && (self.lastStandTime == nil || stepSample.endDate > self.lastStandTime!) && now.timeIntervalSince(stepSample.endDate) <= freshnessThreshold {
+                    if stepCount >= 10 && (self.lastStandTime == nil || stepSample.endDate > self.lastStandTime!) && now.timeIntervalSince(stepSample.endDate) <= freshnessThreshold {
                         self.lastStandTime = stepSample.endDate
                         print("✅ Updated lastStandTime to:", self.lastStandTime!)
                         self.updateTimeSinceLastStand()
@@ -103,7 +103,7 @@ class HealthKitManager: ObservableObject {
     }
     
     private func startFetchTimer() {
-        fetchTimer = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] _ in
+        fetchTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             self?.evaluateRecentStepIntervals()
         }
     }
@@ -156,7 +156,7 @@ class HealthKitManager: ObservableObject {
         }
     }
     
-    func fetchStepCountsByInterval(intervalMinutes: Int = 5, completion: @escaping ([Date: Double]) -> Void) {
+    func fetchStepCountsByInterval(intervalMinutes: Int = 1, completion: @escaping ([Date: Double]) -> Void) {
         let calendar = Calendar.current
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
@@ -201,16 +201,16 @@ class HealthKitManager: ObservableObject {
     }
     
     func evaluateRecentStepIntervals() {
-        fetchStepCountsByInterval(intervalMinutes: 5) { intervalSteps in
+        fetchStepCountsByInterval(intervalMinutes: 1) { intervalSteps in
             let sortedIntervals = intervalSteps.sorted(by: { $0.key > $1.key }) // latest first
             let now = Date()
-            let freshnessThreshold: TimeInterval = 5 * 60 // 15 minutes (increased from 5)
-            let stepThreshold = 20.0 // reduced from 30
+            let freshnessThreshold: TimeInterval = 1 * 60 // 15 minutes (increased from 5)
+            let stepThreshold = 10.0 // reduced from 30
 
             print("📊 Total intervals to check: \(sortedIntervals.count)")
             
             for (intervalStart, stepCount) in sortedIntervals {
-                let intervalEnd = intervalStart.addingTimeInterval(5 * 60)
+                let intervalEnd = intervalStart.addingTimeInterval(1 * 60)
                 let isRecent = now.timeIntervalSince(intervalEnd) <= freshnessThreshold
                 let isValid = stepCount >= stepThreshold && isRecent
 
@@ -241,7 +241,7 @@ class HealthKitManager: ObservableObject {
             if (activity.walking || activity.running),
                activity.confidence != .low {
                 self.recentlyWalked = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 60) {
                     self.recentlyWalked = false // reset after 5 minutes
                 }
             }

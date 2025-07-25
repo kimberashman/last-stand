@@ -309,8 +309,8 @@ struct StandingClockView: View {
             let startOfDay = calendar.startOfDay(for: now)
             var segments: [ActivitySegment] = []
             var anchor = startOfDay
-            for _ in 0..<288 { // 24*12 = 288 intervals
-                let end = calendar.date(byAdding: .minute, value: 5, to: anchor)!
+            for _ in 0..<1440 { // 24*60 = 1440 intervals
+                let end = calendar.date(byAdding: .minute, value: 1, to: anchor)!
                 if let steps = stepCounts[anchor] {
                     print("🪵 Interval starting at \(anchor): Steps = \(steps)")
                     let isActive: Bool?
