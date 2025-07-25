@@ -4,7 +4,13 @@ import HealthKit
 struct StepHour: Identifiable {
     let id = UUID()
     var hour: Int
-    var isActive: Bool
+    var activeMinutes: Int
+    var totalMinutes: Int
+
+    var activityRatio: Double {
+        guard totalMinutes > 0 else { return 0 }
+        return Double(activeMinutes) / Double(totalMinutes)
+    }
 }
 
 class HourStepModel: ObservableObject {
@@ -38,7 +44,7 @@ struct MovementSummaryView: View {
                 }
             }
 
-            Text("Active Hours: \(hourStepModel.steps.filter { $0.isActive }.count)/\(hourStepModel.steps.count)")
+            Text("Active Hours: \(hourStepModel.steps.filter { $0.activityRatio > 0 }.count)/\(hourStepModel.steps.count)")
                 .foregroundColor(textColor)
             Text("Longest Sedentary Period: \(longestSedentaryStreak) min")
                 .foregroundColor(textColor.opacity(0.8))
@@ -60,12 +66,18 @@ struct MovementSummaryView: View {
             var results: [StepHour] = []
             for hour in workHours {
                 let date = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: startOfDay)!
-                let hourSteps = (0..<60).reduce(0) { sum, minute in
+                var activeMinutes = 0
+                var totalMinutes = 0
+
+                for minute in 0..<60 {
                     let t = calendar.date(byAdding: .minute, value: minute, to: date)!
-                    return sum + Int(stepCounts[t] ?? 0)
+                    if let steps = stepCounts[t], steps > 0 {
+                        activeMinutes += 1
+                    }
+                    totalMinutes += 1
                 }
-                let isActive = hourSteps >= stepThreshold
-                results.append(StepHour(hour: hour, isActive: isActive))
+
+                results.append(StepHour(hour: hour, activeMinutes: activeMinutes, totalMinutes: totalMinutes))
             }
 
             // Compute the longest sedentary streak using minute-level stepCounts
@@ -122,7 +134,13 @@ struct MovementSummaryView: View {
         guard let stepHour = hourStepModel.steps.first(where: { $0.hour == hour }) else {
             return ringInactiveColor
         }
-        return stepHour.isActive ? ringActiveColor : ringPartialColor
+        let ratio = stepHour.activityRatio
+        let start = ringPartialColor.components
+        let end = ringActiveColor.components
+        let r = start.red + (end.red - start.red) * ratio
+        let g = start.green + (end.green - start.green) * ratio
+        let b = start.blue + (end.blue - start.blue) * ratio
+        return Color(red: r, green: g, blue: b)
     }
 }
 
