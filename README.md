@@ -45,8 +45,8 @@ The app retrieves step counts using `HKQuantityTypeIdentifier.stepCount` and inf
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/your-username/stilltime.git
-   cd stilltime
+   git clone https://github.com/kimberashman/last-stand.git
+   cd last-stand
    ```
 
 2.	Open in Xcode:
