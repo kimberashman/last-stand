@@ -1,50 +1,65 @@
-# 🕒 Last Stand
+# StillTime – Apple Watch Stand Tracker
 
-**Last Stand** is a wellness-focused iOS and Apple Watch app that tracks how long it's been since you last stood up. Designed to help promote healthier daily habits by encouraging movement and reducing prolonged sitting.
+**StillTime** is a lightweight Apple Watch companion app that helps you visualize how long you've been sedentary and prompts you to move throughout the day. Unlike Apple’s built-in stand reminders, StillTime offers more precise, minute-level tracking based on actual step counts from HealthKit.
 
----
+## Features
 
-## 🚀 Features
+- Circular "clock view" with hour segments representing stand activity
+- Summary view with dot indicators showing movement during work hours (9am–5pm)
+- Real-time sedentary timer
+- Longest sedentary period calculation
+- Minimal UI focused on glanceability
+- HealthKit integration for step count data
 
-- ⌚️ Integrates with Apple Watch to detect standing events via HealthKit
-- ⏱️ Real-time display of time elapsed since last stand
-- 🔔 Optional inactivity reminders after prolonged sitting
-- 📊 (Planned) History view of past standing intervals
+## How It Works
 
----
+The app retrieves step counts using `HKQuantityTypeIdentifier.stepCount` and infers sedentary periods based on minute-level intervals. Movement is credited for any minute with at least a small number of steps (default threshold: 10). This avoids relying solely on Apple’s binary `appleStandHour` flag.
 
-## 📱 Platforms
+- **Clock View**: Displays a ring with segments for each hour of the day, color-coded by standing activity.
+- **Summary View**: Shows per-hour movement dots during work hours and reports total active hours and the longest continuous sedentary period.
 
-- iOS 15+
-- watchOS 8+
-- Built in **Swift** with **SwiftUI** and **HealthKit**
+## Architecture
 
----
+- `HealthKitManager.swift`: Handles all HealthKit data fetching and permissions
+- `ContentView.swift`: Swipable view container for main app screens
+- `ClockView.swift`: Displays circular activity ring
+- `MovementSummaryView.swift`: Displays per-hour activity dots and stats
+- `StepHour`: Model for hour-by-hour step analysis
+- Uses `ObservableObject` and `@Published` properties for reactive updates
 
-## 🔐 Permissions
+## Development Notes
 
-This app uses Apple HealthKit to read stand hour data. On first launch, the app will request permission to read:
+- HealthKit data is not available in the simulator. Test on a physical device with Health permissions granted.
+- The app uses a 60-second timer to refresh step data regularly.
+- Requires explicit HealthKit authorization to read step count data.
+- Movement is defined as ≥10 steps per minute; this can be adjusted in `HealthKitManager.swift`.
 
-- `HKCategoryTypeIdentifierAppleStandHour`
+## Requirements
 
-No personal health data is stored or transmitted externally. All processing happens on-device.
-
----
-
-## 🧰 Tech Stack
-
-- Swift 5
+- iOS 17+
+- watchOS 10+
+- Xcode 15+
 - SwiftUI
-- HealthKit
-- Combine
-- WatchConnectivity (for syncing iPhone ↔ Apple Watch)
-- Local Notifications
 
----
+## Setup
 
-## 🏗️ Installation
-
-1. Clone this repository:
+1. Clone the repo:
    ```bash
-   git clone https://github.com/yourusername/last-stand.git
-   cd last-stand
+   git clone https://github.com/your-username/stilltime.git
+   cd stilltime
+   ```
+
+2.	Open in Xcode:
+    ```bash
+    open StillTime.xcodeproj    
+    ```
+
+3.	Ensure you:
+- Enable HealthKit capabilities
+- Run on a physical device with step data
+- Grant Health permissions when prompted
+
+
+## License
+
+MIT © Kimber Ashman
